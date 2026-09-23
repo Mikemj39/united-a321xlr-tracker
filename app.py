@@ -7,41 +7,27 @@ st.set_page_config(
     layout="wide"
 )
 
+# -------------------------
+# Load master fleet database
+# -------------------------
+
+fleet = pd.read_csv("fleet.csv")
+
+# -------------------------
+# Calculate fleet statistics
+# -------------------------
+
+total_order = 50
+delivered = len(fleet[fleet["fleet_status"] == "Active"])
+pre_delivery = len(fleet[fleet["fleet_status"] == "Pre-delivery"])
+tracked = len(fleet)
+
+# -------------------------
+# Header
+# -------------------------
+
 st.title("✈️ United A321XLR Fleet Tracker")
 st.caption("Tracking the United Airlines Airbus A321XLR fleet")
-
-# -------------------------
-# Fleet data
-# -------------------------
-
-fleet = [
-    {
-        "Registration": "N64321",
-        "MSN": "12581",
-        "Status": "Active",
-        "Location": "Tracking coming soon",
-        "Flight": "—",
-        "Route": "—"
-    },
-    {
-        "Registration": "N64322",
-        "MSN": "12820",
-        "Status": "Pre-delivery",
-        "Location": "XFW",
-        "Flight": "—",
-        "Route": "—"
-    },
-    {
-        "Registration": "N54323",
-        "MSN": "12979",
-        "Status": "Pre-delivery",
-        "Location": "XFW",
-        "Flight": "—",
-        "Route": "—"
-    }
-]
-
-df = pd.DataFrame(fleet)
 
 # -------------------------
 # Fleet overview
@@ -49,12 +35,41 @@ df = pd.DataFrame(fleet)
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("United XLR Order", "50")
-col2.metric("Delivered", "1")
-col3.metric("Pre-Delivery", "2")
-col4.metric("Tracked Aircraft", len(df))
+col1.metric("United XLR Order", total_order)
+col2.metric("Delivered", delivered)
+col3.metric("Pre-Delivery", pre_delivery)
+col4.metric("Tracked Aircraft", tracked)
 
 st.divider()
+
+# -------------------------
+# Prepare fleet table
+# -------------------------
+
+display_fleet = fleet[
+    [
+        "registration",
+        "msn",
+        "fleet_status",
+        "location",
+        "delivery_date",
+        "test_registration",
+        "notes"
+    ]
+].copy()
+
+display_fleet.columns = [
+    "Registration",
+    "MSN",
+    "Status",
+    "Location",
+    "Delivery Date",
+    "Test Registration",
+    "Notes"
+]
+
+# Replace blank values with —
+display_fleet = display_fleet.fillna("—")
 
 # -------------------------
 # Fleet table
@@ -63,11 +78,13 @@ st.divider()
 st.subheader("Fleet Status")
 
 st.dataframe(
-    df,
+    display_fleet,
     use_container_width=True,
     hide_index=True
 )
 
 st.divider()
 
-st.caption("United A321XLR Fleet Tracker • Data integration coming soon")
+st.caption(
+    "United A321XLR Fleet Tracker • Fleet database connected • Live flight data coming soon"
+)
