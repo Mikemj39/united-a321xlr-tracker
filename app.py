@@ -110,13 +110,111 @@ display_fleet = fleet[
     ]
 ].copy()
 
+
+# Start with the manually stored fleet.csv location.
+# Pre-delivery aircraft will continue to use this location
+# until operational flight records exist for them.
+display_fleet["current_location"] = display_fleet["location"]
+
+# Last flight starts blank for aircraft with no stored flights.
+display_fleet["last_flight"] = "—"
+
+
+# --------------------------------------------------
+# Add Dynamic Flight Information to Fleet Table
+# --------------------------------------------------
+
+if not flights.empty and "registration" in flights.columns:
+
+    fleet_flights = flights.copy()
+
+    # Convert takeoff time so flights can be sorted correctly.
+    fleet_flights["takeoff_time"] = pd.to_datetime(
+        fleet_flights["takeoff_time"],
+        errors="coerce",
+        utc=True
+    )
+
+    # Newest flights first.
+    fleet_flights = fleet_flights.sort_values(
+        "takeoff_time",
+        ascending=False
+    )
+
+    # Keep the most recent completed flight for each registration.
+    latest_flights = (
+        fleet_flights
+        .dropna(subset=["registration"])
+        .drop_duplicates(
+            subset=["registration"],
+            keep="first"
+        )
+    )
+
+    # Apply the latest flight information to each aircraft
+    # in the master fleet database.
+    for _, latest in latest_flights.iterrows():
+
+        registration = latest.get("registration")
+        destination = latest.get("destination")
+        origin = latest.get("origin")
+        flight_number = latest.get("flight_number")
+
+        aircraft_match = (
+            display_fleet["registration"] == registration
+        )
+
+        # Latest destination becomes current known location.
+        if pd.notna(destination):
+
+            display_fleet.loc[
+                aircraft_match,
+                "current_location"
+            ] = destination
+
+        # Build a compact last-flight description.
+        if (
+            pd.notna(flight_number)
+            and pd.notna(origin)
+            and pd.notna(destination)
+        ):
+
+            last_flight_text = (
+                f"{flight_number} "
+                f"{origin} → {destination}"
+            )
+
+            display_fleet.loc[
+                aircraft_match,
+                "last_flight"
+            ] = last_flight_text
+
+
+# --------------------------------------------------
+# Build Final Fleet Display Table
+# --------------------------------------------------
+
+display_fleet = display_fleet[
+    [
+        "registration",
+        "msn",
+        "fleet_status",
+        "current_location",
+        "delivery_date",
+        "test_registration",
+        "last_flight",
+        "notes"
+    ]
+].copy()
+
 display_fleet.columns = [
     "Registration",
     "MSN",
     "Status",
-    "Location",
+    "Current Location",
     "Delivery Date",
     "Test Registration",
+    "Last Flight",
     "Notes"
 ]
 
