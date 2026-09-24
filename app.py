@@ -6,7 +6,43 @@ st.set_page_config(
     page_icon="✈️",
     layout="wide"
 )
+# -------------------------
+# FR24 Sandbox Test
+# -------------------------
 
+sandbox_token = st.secrets["FR24_SANDBOX_TOKEN"]
+
+headers = {
+    "Accept": "application/json",
+    "Authorization": f"Bearer {sandbox_token}",
+    "Accept-Version": "v1"
+}
+
+try:
+    sandbox_response = requests.get(
+        "https://fr24api.flightradar24.com/api/live/flight-positions/full",
+        headers=headers,
+        params={"registration": "N64321"},
+        timeout=10
+    )
+
+    if sandbox_response.status_code == 200:
+        sandbox_data = sandbox_response.json()
+
+        st.success("🧪 FR24 Sandbox connected successfully!")
+
+        with st.expander("View sandbox API response"):
+            st.json(sandbox_data)
+
+    else:
+        st.error(
+            f"FR24 Sandbox error: {sandbox_response.status_code}"
+        )
+        st.code(sandbox_response.text)
+
+except requests.RequestException as e:
+    st.error("Could not connect to the FR24 Sandbox.")
+    st.code(str(e))
 # -------------------------
 # Load master fleet database
 # -------------------------
