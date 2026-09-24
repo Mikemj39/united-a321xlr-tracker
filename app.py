@@ -31,7 +31,23 @@ params = {
     "limit": 20,
     "sort": "desc"
 }
+def format_flight_time(seconds):
+    if seconds is None:
+        return "In progress"
 
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+
+    return f"{hours}h {minutes}m"
+
+
+def km_to_miles(km):
+    if km is None:
+        return "In progress"
+
+    miles = km * 0.621371
+    return f"{miles:,.0f} miles"
 try:
     response = requests.get(
         "https://fr24api.flightradar24.com/api/flight-summary/full",
@@ -54,8 +70,8 @@ try:
             st.write("**Destination:**", flight.get("dest_iata", "—"))
             st.write("**Takeoff:**", flight.get("datetime_takeoff", "—"))
             st.write("**Landing:**", flight.get("datetime_landed", "—"))
-            st.write("**Flight Time (seconds):**", flight.get("flight_time", "—"))
-            st.write("**Actual Distance (km):**", flight.get("actual_distance", "—"))
+            st.write("**Flight Time:**",format_flight_time(flight.get("flight_time")))
+            st.write("**Distance:**",km_to_miles(flight.get("actual_distance")))
             st.write("**Flight Ended:**", flight.get("flight_ended", "—"))
             st.write("**FR24 ID:**", flight.get("fr24_id", "—"))
 
