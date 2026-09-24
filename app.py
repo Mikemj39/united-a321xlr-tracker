@@ -67,8 +67,24 @@ fleet = pd.read_csv("fleet.csv")
 # --------------------------------------------------
 
 total_order = 50
-delivered = len(fleet[fleet["fleet_status"] == "Active"])
-pre_delivery = len(fleet[fleet["fleet_status"] == "Pre-delivery"])
+
+# Delivered includes aircraft already in service
+# plus aircraft handed over but not yet in revenue service.
+delivered = len(
+    fleet[
+        fleet["fleet_status"].isin(
+            ["Delivered", "Active"]
+        )
+    ]
+)
+
+# In Service includes only aircraft currently active.
+active = len(
+    fleet[
+        fleet["fleet_status"] == "Active"
+    ]
+)
+
 tracked = len(fleet)
 
 
@@ -88,7 +104,7 @@ col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("United XLR Order", total_order)
 col2.metric("Delivered", delivered)
-col3.metric("Pre-Delivery", pre_delivery)
+col3.metric("In Service", active)
 col4.metric("Tracked Aircraft", tracked)
 
 st.divider()
@@ -105,18 +121,20 @@ display_fleet = fleet[
         "fleet_status",
         "location",
         "delivery_date",
+        "entry_into_service",
         "test_registration",
         "notes"
     ]
 ].copy()
 
 
-# Start with the manually stored fleet.csv location.
-# Pre-delivery aircraft will continue to use this location
-# until operational flight records exist for them.
+# Start with manually stored location from fleet.csv.
+# This is used for aircraft that do not yet have
+# operational flight records in Supabase.
 display_fleet["current_location"] = display_fleet["location"]
 
-# Last flight starts blank for aircraft with no stored flights.
+# Aircraft without operational flight records
+# start with no last flight.
 display_fleet["last_flight"] = "—"
 
 
@@ -128,20 +146,19 @@ if not flights.empty and "registration" in flights.columns:
 
     fleet_flights = flights.copy()
 
-    # Convert takeoff time so flights can be sorted correctly.
     fleet_flights["takeoff_time"] = pd.to_datetime(
         fleet_flights["takeoff_time"],
         errors="coerce",
         utc=True
     )
 
-    # Newest flights first.
+    # Newest flights first
     fleet_flights = fleet_flights.sort_values(
         "takeoff_time",
         ascending=False
     )
 
-    # Keep the most recent completed flight for each registration.
+    # Keep newest completed flight for each aircraft
     latest_flights = (
         fleet_flights
         .dropna(subset=["registration"])
@@ -151,8 +168,6 @@ if not flights.empty and "registration" in flights.columns:
         )
     )
 
-    # Apply the latest flight information to each aircraft
-    # in the master fleet database.
     for _, latest in latest_flights.iterrows():
 
         registration = latest.get("registration")
@@ -164,7 +179,8 @@ if not flights.empty and "registration" in flights.columns:
             display_fleet["registration"] == registration
         )
 
-        # Latest destination becomes current known location.
+        # Destination of latest completed flight
+        # becomes current known airport.
         if pd.notna(destination):
 
             display_fleet.loc[
@@ -172,7 +188,7 @@ if not flights.empty and "registration" in flights.columns:
                 "current_location"
             ] = destination
 
-        # Build a compact last-flight description.
+        # Build last-flight description.
         if (
             pd.notna(flight_number)
             and pd.notna(origin)
@@ -201,6 +217,7 @@ display_fleet = display_fleet[
         "fleet_status",
         "current_location",
         "delivery_date",
+        "entry_into_service",
         "test_registration",
         "last_flight",
         "notes"
@@ -213,6 +230,7 @@ display_fleet.columns = [
     "Status",
     "Current Location",
     "Delivery Date",
+    "Entry Into Service",
     "Test Registration",
     "Last Flight",
     "Notes"
@@ -393,7 +411,8 @@ if not xlr_flights.empty:
         "route"
     ]
 
-    # Current airport = destination of most recent completed flight
+    # Current airport = destination of
+    # most recent completed flight.
     current_airport = latest_flight[
         "destination"
     ]
@@ -438,7 +457,6 @@ if not xlr_flights.empty:
         latest_flight_number,
         latest_route
     )
-
 
     st.divider()
 
