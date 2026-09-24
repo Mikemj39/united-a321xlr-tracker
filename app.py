@@ -22,7 +22,7 @@ try:
     sandbox_response = requests.get(
         "https://fr24api.flightradar24.com/api/live/flight-positions/full",
         headers=headers,
-        params={"registration": "N64321"},
+        params={"registrations": "N64321"},
         timeout=10
     )
 
