@@ -8,7 +8,7 @@ st.set_page_config(
     layout="wide"
 )
 # -------------------------
-# Supabase Connection Test
+# Supabase Connection
 # -------------------------
 
 supabase = create_client(
@@ -17,17 +17,20 @@ supabase = create_client(
 )
 
 try:
-    db_test = supabase.table("flights").select("*").limit(5).execute()
+    flight_response = (
+        supabase
+        .table("flights")
+        .select("*")
+        .order("takeoff_time", desc=True)
+        .execute()
+    )
 
-    st.success("🗄️ Supabase database connected successfully!")
-
-    with st.expander("View database test"):
-        st.write(f"Rows returned: {len(db_test.data)}")
-        st.dataframe(db_test.data)
+    flights = pd.DataFrame(flight_response.data)
 
 except Exception as e:
-    st.error("Could not connect to the Supabase database.")
+    st.error("Could not load flight data.")
     st.code(str(e))
+    flights = pd.DataFrame()
 # -------------------------
 # Load master fleet database
 # -------------------------
@@ -91,7 +94,110 @@ display_fleet.columns = [
 
 # Replace blank values with —
 display_fleet = display_fleet.fillna("—")
+st.divider()
 
+# -------------------------
+# Flight Statistics
+# -------------------------
+
+st.subheader("N64321 Flight Statistics")
+
+xlr_flights = flights[flights["registration"] == "N64321"].copy()
+
+if not xlr_flights.empty:
+
+    # Convert raw FR24 units
+    xlr_flights["distance_miles"] = (
+        pd.to_numeric(xlr_flights["distance_km"], errors="coerce")
+        * 0.621371
+    )
+
+    xlr_flights["flight_hours"] = (
+        pd.to_numeric(
+            xlr_flights["flight_time_seconds"],
+            errors="coerce"
+        ) / 3600
+    )
+
+    # Overall statistics
+    total_flights = len(xlr_flights)
+    total_miles = xlr_flights["distance_miles"].sum()
+    total_hours = xlr_flights["flight_hours"].sum()
+    average_miles = xlr_flights["distance_miles"].mean()
+    average_hours = xlr_flights["flight_hours"].mean()
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric("Flights", f"{total_flights:,}")
+    col2.metric("Total Miles", f"{total_miles:,.0f}")
+    col3.metric("Flight Hours", f"{total_hours:,.1f}")
+    col4.metric("Avg Distance", f"{average_miles:,.0f} mi")
+    col5.metric("Avg Duration", f"{average_hours:.1f} hrs")
+
+    st.divider()
+
+    # -------------------------
+    # Flight Log
+    # -------------------------
+
+    st.subheader("N64321 Flight Log")
+
+    xlr_flights["takeoff_time"] = pd.to_datetime(
+        xlr_flights["takeoff_time"]
+    )
+
+    xlr_flights["landing_time"] = pd.to_datetime(
+        xlr_flights["landing_time"]
+    )
+
+    def format_duration(seconds):
+        if pd.isna(seconds):
+            return "—"
+
+        seconds = int(seconds)
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+
+        return f"{hours}h {minutes}m"
+
+    xlr_flights["Duration"] = (
+        xlr_flights["flight_time_seconds"]
+        .apply(format_duration)
+    )
+
+    xlr_flights["Distance"] = (
+        xlr_flights["distance_miles"]
+        .apply(lambda x: f"{x:,.0f} mi" if pd.notna(x) else "—")
+    )
+
+    flight_log = xlr_flights[
+        [
+            "takeoff_time",
+            "flight_number",
+            "origin",
+            "destination",
+            "Duration",
+            "Distance"
+        ]
+    ].copy()
+
+    flight_log.columns = [
+        "Date / Takeoff",
+        "Flight",
+        "From",
+        "To",
+        "Duration",
+        "Distance"
+    ]
+
+    st.dataframe(
+        flight_log,
+        use_container_width=True,
+        hide_index=True
+    )
+
+else:
+    st.info("No completed flight records are currently stored for N64321.")
 # -------------------------
 # Fleet table
 # -------------------------
