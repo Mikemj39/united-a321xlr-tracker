@@ -7,41 +7,52 @@ st.set_page_config(
     layout="wide"
 )
 # -------------------------
-# FR24 Sandbox Test
+# FR24 Production Test - N64321
 # -------------------------
 
-sandbox_token = st.secrets["FR24_SANDBOX_TOKEN"]
+fr24_token = st.secrets["FR24_API_TOKEN"]
 
 headers = {
     "Accept": "application/json",
-    "Authorization": f"Bearer {sandbox_token}",
+    "Authorization": f"Bearer {fr24_token}",
     "Accept-Version": "v1"
 }
 
 try:
-    sandbox_response = requests.get(
+    response = requests.get(
         "https://fr24api.flightradar24.com/api/live/flight-positions/full",
         headers=headers,
         params={"registrations": "N64321"},
         timeout=10
     )
 
-    if sandbox_response.status_code == 200:
-        sandbox_data = sandbox_response.json()
+    if response.status_code == 200:
+        fr24_data = response.json()
+        flights = fr24_data.get("data", [])
 
-        st.success("🧪 FR24 Sandbox connected successfully!")
+        if flights:
+            flight = flights[0]
 
-        with st.expander("View sandbox API response"):
-            st.json(sandbox_data)
+            st.success("✈️ N64321 found on FR24!")
+
+            st.write("**Flight:**", flight.get("flight", "—"))
+            st.write("**Registration:**", flight.get("reg", "—"))
+            st.write("**Origin:**", flight.get("orig_iata", "—"))
+            st.write("**Destination:**", flight.get("dest_iata", "—"))
+            st.write("**FR24 Flight ID:**", flight.get("fr24_id", "—"))
+
+            with st.expander("View full FR24 response"):
+                st.json(fr24_data)
+
+        else:
+            st.info("N64321 is not currently appearing as an active flight on FR24.")
 
     else:
-        st.error(
-            f"FR24 Sandbox error: {sandbox_response.status_code}"
-        )
-        st.code(sandbox_response.text)
+        st.error(f"FR24 API error: {response.status_code}")
+        st.code(response.text)
 
 except requests.RequestException as e:
-    st.error("Could not connect to the FR24 Sandbox.")
+    st.error("Could not connect to the FR24 API.")
     st.code(str(e))
 # -------------------------
 # Load master fleet database
