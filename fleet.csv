@@ -1,4 +1,11 @@
-registration,msn,test_registration,fleet_status,delivery_date,location,notes
-N64321,12581,,Active,2026-06-03,,First United A321XLR delivered
-N64322,12820,D-AVYL,Pre-delivery,,XFW,Second United A321XLR
-N54323,12979,D-AXXZ,Pre-delivery,,XFW,Future United A321XLR
+registration,msn,fleet_status,location,delivery_date,test_registration,notes
+N64321,12581,Active,,2026-06-03,,First United A321XLR delivered
+N64322,12820,Pre-delivery,XFW,,D-AVYL,Second United A321XLR
+N54323,12979,Pre-delivery,XFW,,D-AXXZ,Future United A321XLR
+N54325,,On Order,,,,United A321XLR on order
+N54326,,On Order,,,,United A321XLR on order
+N54332,,On Order,,,,United A321XLR on order
+N54333,,On Order,,,,United A321XLR on order
+N64324,,On Order,,,,United A321XLR on order
+N64327,,On Order,,,,United A321XLR on order
+N74328,,On Order,,,,United A321XLR on order
