@@ -1,89 +1,32 @@
 import streamlit as st
 import pandas as pd
 import requests
+from supabase import create_client
 st.set_page_config(
     page_title="United A321XLR Fleet Tracker",
     page_icon="✈️",
     layout="wide"
 )
 # -------------------------
-# FR24 Flight Summary Test - N64321
+# Supabase Connection Test
 # -------------------------
 
-from datetime import datetime, timedelta, timezone
+supabase = create_client(
+    st.secrets["SUPABASE_URL"],
+    st.secrets["SUPABASE_KEY"]
+)
 
-fr24_token = st.secrets["FR24_API_TOKEN"]
-
-headers = {
-    "Accept": "application/json",
-    "Authorization": f"Bearer {fr24_token}",
-    "Accept-Version": "v1"
-}
-
-# Search the last 24 hours
-now = datetime.now(timezone.utc)
-yesterday = now - timedelta(hours=24)
-
-params = {
-    "flight_datetime_from": yesterday.strftime("%Y-%m-%dT%H:%M:%S"),
-    "flight_datetime_to": now.strftime("%Y-%m-%dT%H:%M:%S"),
-    "registrations": "N64321",
-    "limit": 20,
-    "sort": "desc"
-}
-def format_flight_time(seconds):
-    if seconds is None:
-        return "In progress"
-
-    seconds = int(seconds)
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-
-    return f"{hours}h {minutes}m"
-
-
-def km_to_miles(km):
-    if km is None:
-        return "In progress"
-
-    miles = km * 0.621371
-    return f"{miles:,.0f} miles"
 try:
-    response = requests.get(
-        "https://fr24api.flightradar24.com/api/flight-summary/full",
-        headers=headers,
-        params=params,
-        timeout=10
-    )
+    db_test = supabase.table("flights").select("*").limit(5).execute()
 
-    if response.status_code == 200:
-        fr24_data = response.json()
-        flights = fr24_data.get("data", [])
+    st.success("🗄️ Supabase database connected successfully!")
 
-        st.success(f"✈️ Found {len(flights)} N64321 flight(s) in the last 24 hours")
+    with st.expander("View database test"):
+        st.write(f"Rows returned: {len(db_test.data)}")
+        st.dataframe(db_test.data)
 
-        for flight in flights:
-            st.write("---")
-            st.write("**Flight:**", flight.get("flight", "—"))
-            st.write("**Registration:**", flight.get("reg", "—"))
-            st.write("**Origin:**", flight.get("orig_iata", "—"))
-            st.write("**Destination:**", flight.get("dest_iata", "—"))
-            st.write("**Takeoff:**", flight.get("datetime_takeoff", "—"))
-            st.write("**Landing:**", flight.get("datetime_landed", "—"))
-            st.write("**Flight Time:**",format_flight_time(flight.get("flight_time")))
-            st.write("**Distance:**",km_to_miles(flight.get("actual_distance")))
-            st.write("**Flight Ended:**", flight.get("flight_ended", "—"))
-            st.write("**FR24 ID:**", flight.get("fr24_id", "—"))
-
-        with st.expander("View full Flight Summary response"):
-            st.json(fr24_data)
-
-    else:
-        st.error(f"FR24 API error: {response.status_code}")
-        st.code(response.text)
-
-except requests.RequestException as e:
-    st.error("Could not connect to the FR24 API.")
+except Exception as e:
+    st.error("Could not connect to the Supabase database.")
     st.code(str(e))
 # -------------------------
 # Load master fleet database
