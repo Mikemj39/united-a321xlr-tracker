@@ -6,31 +6,7 @@ st.set_page_config(
     page_icon="✈️",
     layout="wide"
 )
-# -------------------------
-# FR24 API connection test
-# -------------------------
 
-FR24_API_TOKEN = st.secrets["FR24_API_TOKEN"]
-
-headers = {
-    "Accept": "application/json",
-    "Authorization": f"Bearer {FR24_API_TOKEN}"
-}
-
-try:
-    response = requests.get(
-        "https://fr24api.flightradar24.com/api/usage",
-        headers=headers,
-        timeout=10
-    )
-
-    if response.status_code == 200:
-        st.success("✅ Flightradar24 API connected")
-    else:
-        st.error(f"FR24 API connection failed: {response.status_code}")
-
-except requests.RequestException:
-    st.error("Could not connect to Flightradar24 API")
 # -------------------------
 # Load master fleet database
 # -------------------------
