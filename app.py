@@ -196,8 +196,14 @@ if not xlr_flights.empty:
         hide_index=True
     )
 
+if not xlr_flights.empty:
+    # statistics
+
+    with st.expander(...):
+        # ENTIRE flight log
+
 else:
-    st.info("No completed flight records are currently stored for N64321.")
+    st.info(...)
 # -------------------------
 # Fleet table
 # -------------------------
