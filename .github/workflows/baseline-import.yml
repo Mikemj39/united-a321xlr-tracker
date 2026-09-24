@@ -1,0 +1,27 @@
+name: N64321 Baseline Import
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import-history:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests supabase
+
+      - name: Run baseline importer
+        env:
+          FR24_API_TOKEN: ${{ secrets.FR24_API_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python baseline_import.py
