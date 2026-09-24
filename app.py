@@ -7,8 +7,10 @@ st.set_page_config(
     layout="wide"
 )
 # -------------------------
-# FR24 Production Test - N64321
+# FR24 Flight Summary Test - N64321
 # -------------------------
+
+from datetime import datetime, timedelta, timezone
 
 fr24_token = st.secrets["FR24_API_TOKEN"]
 
@@ -18,11 +20,23 @@ headers = {
     "Accept-Version": "v1"
 }
 
+# Search the last 24 hours
+now = datetime.now(timezone.utc)
+yesterday = now - timedelta(hours=24)
+
+params = {
+    "flight_datetime_from": yesterday.strftime("%Y-%m-%dT%H:%M:%S"),
+    "flight_datetime_to": now.strftime("%Y-%m-%dT%H:%M:%S"),
+    "registrations": "N64321",
+    "limit": 20,
+    "sort": "desc"
+}
+
 try:
     response = requests.get(
-        "https://fr24api.flightradar24.com/api/live/flight-positions/full",
+        "https://fr24api.flightradar24.com/api/flight-summary/full",
         headers=headers,
-        params={"registrations": "N64321"},
+        params=params,
         timeout=10
     )
 
@@ -30,22 +44,23 @@ try:
         fr24_data = response.json()
         flights = fr24_data.get("data", [])
 
-        if flights:
-            flight = flights[0]
+        st.success(f"✈️ Found {len(flights)} N64321 flight(s) in the last 24 hours")
 
-            st.success("✈️ N64321 found on FR24!")
-
+        for flight in flights:
+            st.write("---")
             st.write("**Flight:**", flight.get("flight", "—"))
             st.write("**Registration:**", flight.get("reg", "—"))
             st.write("**Origin:**", flight.get("orig_iata", "—"))
             st.write("**Destination:**", flight.get("dest_iata", "—"))
-            st.write("**FR24 Flight ID:**", flight.get("fr24_id", "—"))
+            st.write("**Takeoff:**", flight.get("datetime_takeoff", "—"))
+            st.write("**Landing:**", flight.get("datetime_landed", "—"))
+            st.write("**Flight Time (seconds):**", flight.get("flight_time", "—"))
+            st.write("**Actual Distance (km):**", flight.get("actual_distance", "—"))
+            st.write("**Flight Ended:**", flight.get("flight_ended", "—"))
+            st.write("**FR24 ID:**", flight.get("fr24_id", "—"))
 
-            with st.expander("View full FR24 response"):
-                st.json(fr24_data)
-
-        else:
-            st.info("N64321 is not currently appearing as an active flight on FR24.")
+        with st.expander("View full Flight Summary response"):
+            st.json(fr24_data)
 
     else:
         st.error(f"FR24 API error: {response.status_code}")
