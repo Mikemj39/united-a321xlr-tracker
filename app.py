@@ -140,7 +140,7 @@ if not xlr_flights.empty:
     # Flight Log
     # -------------------------
 
-st.expander(f"✈️ View N64321 Flight Log ({len(xlr_flights)} flights)"):
+    with st.expander(f"✈️ View N64321 Flight Log ({len(xlr_flights)} flights)"):
 
     xlr_flights["takeoff_time"] = pd.to_datetime(
         xlr_flights["takeoff_time"]
