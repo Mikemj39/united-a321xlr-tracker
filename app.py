@@ -15,6 +15,21 @@ st.set_page_config(
 
 
 # --------------------------------------------------
+# Helper Functions
+# --------------------------------------------------
+
+def format_duration(seconds):
+    if pd.isna(seconds):
+        return "—"
+
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+
+    return f"{hours}h {minutes}m"
+
+
+# --------------------------------------------------
 # Supabase Connection
 # --------------------------------------------------
 
@@ -126,7 +141,10 @@ else:
 
 if not xlr_flights.empty:
 
-    # Convert FR24 kilometers to miles
+    # --------------------------------------------------
+    # Prepare Flight Data
+    # --------------------------------------------------
+
     xlr_flights["distance_miles"] = (
         pd.to_numeric(
             xlr_flights["distance_km"],
@@ -134,22 +152,57 @@ if not xlr_flights.empty:
         ) * 0.621371
     )
 
-    # Convert FR24 seconds to hours
-    xlr_flights["flight_hours"] = (
-        pd.to_numeric(
-            xlr_flights["flight_time_seconds"],
-            errors="coerce"
-        ) / 3600
+    xlr_flights["flight_time_seconds"] = pd.to_numeric(
+        xlr_flights["flight_time_seconds"],
+        errors="coerce"
     )
 
-    # Calculate statistics
-    total_flights = len(xlr_flights)
-    total_miles = xlr_flights["distance_miles"].sum()
-    total_hours = xlr_flights["flight_hours"].sum()
-    average_miles = xlr_flights["distance_miles"].mean()
-    average_hours = xlr_flights["flight_hours"].mean()
+    xlr_flights["flight_hours"] = (
+        xlr_flights["flight_time_seconds"] / 3600
+    )
 
-    # Display statistics
+    xlr_flights["takeoff_time"] = pd.to_datetime(
+        xlr_flights["takeoff_time"],
+        errors="coerce",
+        utc=True
+    )
+
+    xlr_flights["landing_time"] = pd.to_datetime(
+        xlr_flights["landing_time"],
+        errors="coerce",
+        utc=True
+    )
+
+    xlr_flights["route"] = (
+        xlr_flights["origin"].fillna("—")
+        + " → "
+        + xlr_flights["destination"].fillna("—")
+    )
+
+
+    # --------------------------------------------------
+    # Main Statistics
+    # --------------------------------------------------
+
+    total_flights = len(xlr_flights)
+
+    total_miles = xlr_flights[
+        "distance_miles"
+    ].sum()
+
+    total_hours = xlr_flights[
+        "flight_hours"
+    ].sum()
+
+    average_miles = xlr_flights[
+        "distance_miles"
+    ].mean()
+
+    average_seconds = xlr_flights[
+        "flight_time_seconds"
+    ].mean()
+
+
     col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric(
@@ -174,53 +227,142 @@ if not xlr_flights.empty:
 
     col5.metric(
         "Avg Duration",
-        f"{average_hours:.1f} hrs"
+        format_duration(average_seconds)
     )
+
+
+    # --------------------------------------------------
+    # Detailed Statistics
+    # --------------------------------------------------
+
+    st.markdown("### Aircraft Records")
+
+    # Longest flight by distance
+    longest_distance_row = xlr_flights.loc[
+        xlr_flights["distance_miles"].idxmax()
+    ]
+
+    longest_distance = longest_distance_row[
+        "distance_miles"
+    ]
+
+    longest_distance_route = longest_distance_row[
+        "route"
+    ]
+
+    # Longest flight by duration
+    longest_time_row = xlr_flights.loc[
+        xlr_flights["flight_time_seconds"].idxmax()
+    ]
+
+    longest_time = longest_time_row[
+        "flight_time_seconds"
+    ]
+
+    longest_time_route = longest_time_row[
+        "route"
+    ]
+
+    # Most-flown route
+    route_counts = xlr_flights[
+        "route"
+    ].value_counts()
+
+    most_flown_route = route_counts.index[0]
+    most_flown_route_count = route_counts.iloc[0]
+
+    # Airports visited
+    airports = pd.concat(
+        [
+            xlr_flights["origin"],
+            xlr_flights["destination"]
+        ]
+    ).dropna().unique()
+
+    airports_visited = len(airports)
+
+    # Most recent flight
+    latest_flight = xlr_flights.sort_values(
+        "takeoff_time",
+        ascending=False
+    ).iloc[0]
+
+    latest_flight_number = latest_flight[
+        "flight_number"
+    ]
+
+    latest_route = latest_flight[
+        "route"
+    ]
+
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric(
+        "Longest Flight",
+        f"{longest_distance:,.0f} mi",
+        longest_distance_route
+    )
+
+    col2.metric(
+        "Longest Duration",
+        format_duration(longest_time),
+        longest_time_route
+    )
+
+    col3.metric(
+        "Most-Flown Route",
+        most_flown_route,
+        f"{most_flown_route_count} flights"
+    )
+
+    col4.metric(
+        "Airports Visited",
+        airports_visited
+    )
+
+    col5.metric(
+        "Last Flight",
+        latest_flight_number,
+        latest_route
+    )
+
 
     st.divider()
 
 
     # --------------------------------------------------
-    # Collapsible Flight Log
+    # Route Statistics
     # --------------------------------------------------
 
-    with st.expander(
-        f"✈️ View N64321 Flight Log ({total_flights} flights)"
-    ):
+    with st.expander("🛫 View Route Statistics"):
 
-        # Convert timestamps
-        xlr_flights["takeoff_time"] = pd.to_datetime(
-            xlr_flights["takeoff_time"],
-            errors="coerce"
+        route_stats = (
+            xlr_flights
+            .groupby(
+                ["origin", "destination"],
+                dropna=False
+            )
+            .agg(
+                Flights=("fr24_id", "count"),
+                Total_Miles=("distance_miles", "sum"),
+                Avg_Miles=("distance_miles", "mean"),
+                Avg_Duration_Seconds=(
+                    "flight_time_seconds",
+                    "mean"
+                )
+            )
+            .reset_index()
         )
 
-        xlr_flights["landing_time"] = pd.to_datetime(
-            xlr_flights["landing_time"],
-            errors="coerce"
+        route_stats["Route"] = (
+            route_stats["origin"].fillna("—")
+            + " → "
+            + route_stats["destination"].fillna("—")
         )
 
-        # Format flight duration
-        def format_duration(seconds):
-
-            if pd.isna(seconds):
-                return "—"
-
-            seconds = int(seconds)
-
-            hours = seconds // 3600
-            minutes = (seconds % 3600) // 60
-
-            return f"{hours}h {minutes}m"
-
-
-        xlr_flights["Duration"] = (
-            xlr_flights["flight_time_seconds"]
-            .apply(format_duration)
-        )
-
-        # Format distance
-        xlr_flights["Distance"] = (
-            xlr_flights["distance_miles"]
+        route_stats["Total Miles"] = (
+            route_stats["Total_Miles"]
             .apply(
                 lambda x:
                 f"{x:,.0f} mi"
@@ -229,7 +371,66 @@ if not xlr_flights.empty:
             )
         )
 
-        # Build flight log
+        route_stats["Avg Distance"] = (
+            route_stats["Avg_Miles"]
+            .apply(
+                lambda x:
+                f"{x:,.0f} mi"
+                if pd.notna(x)
+                else "—"
+            )
+        )
+
+        route_stats["Avg Duration"] = (
+            route_stats["Avg_Duration_Seconds"]
+            .apply(format_duration)
+        )
+
+        route_display = route_stats[
+            [
+                "Route",
+                "Flights",
+                "Total Miles",
+                "Avg Distance",
+                "Avg Duration"
+            ]
+        ].sort_values(
+            "Flights",
+            ascending=False
+        )
+
+        st.dataframe(
+            route_display,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+    # --------------------------------------------------
+    # Flight Log
+    # --------------------------------------------------
+
+    with st.expander(
+        f"✈️ View N64321 Flight Log ({total_flights} flights)"
+    ):
+
+        xlr_flights["Duration"] = (
+            xlr_flights[
+                "flight_time_seconds"
+            ].apply(format_duration)
+        )
+
+        xlr_flights["Distance"] = (
+            xlr_flights[
+                "distance_miles"
+            ].apply(
+                lambda x:
+                f"{x:,.0f} mi"
+                if pd.notna(x)
+                else "—"
+            )
+        )
+
         flight_log = xlr_flights[
             [
                 "takeoff_time",
@@ -250,7 +451,11 @@ if not xlr_flights.empty:
             "Distance"
         ]
 
-        # Display flight log
+        flight_log = flight_log.sort_values(
+            "Date / Takeoff",
+            ascending=False
+        )
+
         st.dataframe(
             flight_log,
             use_container_width=True,
@@ -266,7 +471,7 @@ else:
 
 
 # --------------------------------------------------
-# Fleet Table
+# Fleet Status
 # --------------------------------------------------
 
 st.divider()
