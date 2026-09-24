@@ -141,6 +141,14 @@ if not xlr_flights.empty:
     # -------------------------
 
     with st.expander(f"✈️ View N64321 Flight Log ({len(xlr_flights)} flights)"):
+        if not xlr_flights.empty:
+    # statistics
+
+    with st.expander(...):
+        # ENTIRE flight log
+
+else:
+    st.info(...)
 
     xlr_flights["takeoff_time"] = pd.to_datetime(
         xlr_flights["takeoff_time"]
@@ -196,14 +204,6 @@ if not xlr_flights.empty:
         hide_index=True
     )
 
-if not xlr_flights.empty:
-    # statistics
-
-    with st.expander(...):
-        # ENTIRE flight log
-
-else:
-    st.info(...)
 # -------------------------
 # Fleet table
 # -------------------------
