@@ -13,7 +13,7 @@ REGISTRATION = "N64321"
 
 # Each run overlaps the previous window slightly.
 # This protects us if FR24 is a little late publishing a completed flight.
-SAFETY_OVERLAP_MINUTES = 60
+SAFETY_OVERLAP_MINUTES = 360
 
 # Used only if collector_state is empty on the first optimized run.
 INITIAL_LOOKBACK_HOURS = 6
