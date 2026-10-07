@@ -68,8 +68,6 @@ fleet = pd.read_csv("fleet.csv")
 
 total_order = 50
 
-# Delivered includes aircraft already in service
-# plus aircraft handed over but not yet in revenue service.
 delivered = len(
     fleet[
         fleet["fleet_status"].isin(
@@ -78,7 +76,6 @@ delivered = len(
     ]
 )
 
-# In Service includes only aircraft currently active.
 active = len(
     fleet[
         fleet["fleet_status"] == "Active"
@@ -127,14 +124,7 @@ display_fleet = fleet[
     ]
 ].copy()
 
-
-# Start with manually stored location from fleet.csv.
-# This is used for aircraft that do not yet have
-# operational flight records in Supabase.
 display_fleet["current_location"] = display_fleet["location"]
-
-# Aircraft without operational flight records
-# start with no last flight.
 display_fleet["last_flight"] = "—"
 
 
@@ -152,13 +142,11 @@ if not flights.empty and "registration" in flights.columns:
         utc=True
     )
 
-    # Newest flights first
     fleet_flights = fleet_flights.sort_values(
         "takeoff_time",
         ascending=False
     )
 
-    # Keep newest completed flight for each aircraft
     latest_flights = (
         fleet_flights
         .dropna(subset=["registration"])
@@ -179,16 +167,12 @@ if not flights.empty and "registration" in flights.columns:
             display_fleet["registration"] == registration
         )
 
-        # Destination of latest completed flight
-        # becomes current known airport.
         if pd.notna(destination):
-
             display_fleet.loc[
                 aircraft_match,
                 "current_location"
             ] = destination
 
-        # Build last-flight description.
         if (
             pd.notna(flight_number)
             and pd.notna(origin)
@@ -228,7 +212,7 @@ display_fleet.columns = [
     "Registration",
     "MSN",
     "Status",
-    "Current Location",
+    "Last Known Airport",
     "Delivery Date",
     "Entry Into Service",
     "Test Registration",
@@ -240,19 +224,49 @@ display_fleet = display_fleet.fillna("—")
 
 
 # --------------------------------------------------
-# N64321 Flight Statistics
+# Aircraft Selector
 # --------------------------------------------------
 
-st.subheader("N64321 Flight Statistics")
+active_aircraft = (
+    fleet[
+        fleet["fleet_status"] == "Active"
+    ]["registration"]
+    .dropna()
+    .tolist()
+)
 
-if not flights.empty and "registration" in flights.columns:
+st.subheader("Aircraft Statistics")
+
+if active_aircraft:
+
+    selected_aircraft = st.selectbox(
+        "Select Aircraft",
+        active_aircraft
+    )
+
+else:
+    selected_aircraft = None
+
+
+# --------------------------------------------------
+# Selected Aircraft Flight Statistics
+# --------------------------------------------------
+
+if (
+    selected_aircraft
+    and not flights.empty
+    and "registration" in flights.columns
+):
 
     xlr_flights = flights[
-        flights["registration"] == "N64321"
+        flights["registration"] == selected_aircraft
     ].copy()
 
 else:
     xlr_flights = pd.DataFrame()
+
+
+st.markdown(f"### {selected_aircraft} Flight Statistics" if selected_aircraft else "### Flight Statistics")
 
 
 if not xlr_flights.empty:
@@ -353,41 +367,62 @@ if not xlr_flights.empty:
 
     st.markdown("### Aircraft Records")
 
-    # Longest flight by distance
-    longest_distance_row = xlr_flights.loc[
-        xlr_flights["distance_miles"].idxmax()
-    ]
+    valid_distance = xlr_flights.dropna(
+        subset=["distance_miles"]
+    )
 
-    longest_distance = longest_distance_row[
-        "distance_miles"
-    ]
+    if not valid_distance.empty:
+        longest_distance_row = valid_distance.loc[
+            valid_distance["distance_miles"].idxmax()
+        ]
 
-    longest_distance_route = longest_distance_row[
-        "route"
-    ]
+        longest_distance = longest_distance_row[
+            "distance_miles"
+        ]
 
-    # Longest flight by duration
-    longest_time_row = xlr_flights.loc[
-        xlr_flights["flight_time_seconds"].idxmax()
-    ]
+        longest_distance_route = longest_distance_row[
+            "route"
+        ]
 
-    longest_time = longest_time_row[
-        "flight_time_seconds"
-    ]
+    else:
+        longest_distance = 0
+        longest_distance_route = "—"
 
-    longest_time_route = longest_time_row[
-        "route"
-    ]
 
-    # Most-flown route
+    valid_duration = xlr_flights.dropna(
+        subset=["flight_time_seconds"]
+    )
+
+    if not valid_duration.empty:
+        longest_time_row = valid_duration.loc[
+            valid_duration["flight_time_seconds"].idxmax()
+        ]
+
+        longest_time = longest_time_row[
+            "flight_time_seconds"
+        ]
+
+        longest_time_route = longest_time_row[
+            "route"
+        ]
+
+    else:
+        longest_time = None
+        longest_time_route = "—"
+
+
     route_counts = xlr_flights[
         "route"
     ].value_counts()
 
-    most_flown_route = route_counts.index[0]
-    most_flown_route_count = route_counts.iloc[0]
+    if not route_counts.empty:
+        most_flown_route = route_counts.index[0]
+        most_flown_route_count = route_counts.iloc[0]
+    else:
+        most_flown_route = "—"
+        most_flown_route_count = 0
 
-    # Airports visited
+
     airports = pd.concat(
         [
             xlr_flights["origin"],
@@ -397,7 +432,7 @@ if not xlr_flights.empty:
 
     airports_visited = len(airports)
 
-    # Most recent flight
+
     latest_flight = xlr_flights.sort_values(
         "takeoff_time",
         ascending=False
@@ -411,9 +446,7 @@ if not xlr_flights.empty:
         "route"
     ]
 
-    # Current airport = destination of
-    # most recent completed flight.
-    current_airport = latest_flight[
+    last_known_airport = latest_flight[
         "destination"
     ]
 
@@ -448,8 +481,8 @@ if not xlr_flights.empty:
     )
 
     col5.metric(
-        "Current Airport",
-        current_airport
+        "Last Known Airport",
+        last_known_airport
     )
 
     col6.metric(
@@ -465,7 +498,9 @@ if not xlr_flights.empty:
     # Route Statistics
     # --------------------------------------------------
 
-    with st.expander("🛫 View Route Statistics"):
+    with st.expander(
+        f"🛫 View {selected_aircraft} Route Statistics"
+    ):
 
         route_stats = (
             xlr_flights
@@ -541,7 +576,8 @@ if not xlr_flights.empty:
     # --------------------------------------------------
 
     with st.expander(
-        f"✈️ View N64321 Flight Log ({total_flights} flights)"
+        f"✈️ View {selected_aircraft} Flight Log "
+        f"({total_flights} flights)"
     ):
 
         xlr_flights["Duration"] = (
@@ -595,9 +631,15 @@ if not xlr_flights.empty:
 
 else:
 
-    st.info(
-        "No completed flight records are currently stored for N64321."
-    )
+    if selected_aircraft:
+        st.info(
+            f"No completed revenue flight records are currently "
+            f"stored for {selected_aircraft}."
+        )
+    else:
+        st.info(
+            "No active aircraft are currently available."
+        )
 
 
 # --------------------------------------------------
