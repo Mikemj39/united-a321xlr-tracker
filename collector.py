@@ -8,15 +8,14 @@ from supabase import create_client
 # Configuration
 # --------------------------------------------------
 
-COLLECTOR_NAME = "united_xlr"
-REGISTRATION = "N64321"
+REGISTRATIONS = [
+    "N64321",
+    "N64322",
+]
 
-# Each run overlaps the previous window slightly.
-# This protects us if FR24 is a little late publishing a completed flight.
-SAFETY_OVERLAP_MINUTES = 720
-
-# Used only if collector_state is empty on the first optimized run.
-INITIAL_LOOKBACK_HOURS = 6
+# Look back far enough to catch flights that were still
+# in progress during the previous day's collection.
+LOOKBACK_HOURS = 30
 
 
 # --------------------------------------------------
@@ -34,71 +33,17 @@ supabase = create_client(
 
 
 # --------------------------------------------------
-# Current Time
+# Build Query Window
 # --------------------------------------------------
 
 now = datetime.now(timezone.utc)
+window_start = now - timedelta(hours=LOOKBACK_HOURS)
 
-
-# --------------------------------------------------
-# Read Collector State
-# --------------------------------------------------
-
-state_response = (
-    supabase
-    .table("collector_state")
-    .select("*")
-    .eq("collector_name", COLLECTOR_NAME)
-    .execute()
-)
-
-if state_response.data:
-
-    last_successful_run_text = (
-        state_response.data[0]["last_successful_run"]
-    )
-
-    last_successful_run = datetime.fromisoformat(
-        last_successful_run_text.replace("Z", "+00:00")
-    )
-
-    window_start = (
-        last_successful_run
-        - timedelta(minutes=SAFETY_OVERLAP_MINUTES)
-    )
-
-    print(
-        f"Previous successful run: "
-        f"{last_successful_run.isoformat()}"
-    )
-
-else:
-
-    # First optimized run only
-    window_start = (
-        now - timedelta(hours=INITIAL_LOOKBACK_HOURS)
-    )
-
-    print(
-        "No previous collector state found. "
-        f"Using initial {INITIAL_LOOKBACK_HOURS}-hour lookback."
-    )
-
-
-# --------------------------------------------------
-# Build FR24 Query Window
-# --------------------------------------------------
-
-date_from = window_start.strftime(
-    "%Y-%m-%dT%H:%M:%S"
-)
-
-date_to = now.strftime(
-    "%Y-%m-%dT%H:%M:%S"
-)
+date_from = window_start.strftime("%Y-%m-%dT%H:%M:%S")
+date_to = now.strftime("%Y-%m-%dT%H:%M:%S")
 
 print(
-    f"Checking {REGISTRATION} from "
+    f"Checking {', '.join(REGISTRATIONS)} from "
     f"{date_from} to {date_to} UTC"
 )
 
@@ -116,7 +61,7 @@ headers = {
 params = {
     "flight_datetime_from": date_from,
     "flight_datetime_to": date_to,
-    "registrations": REGISTRATION,
+    "registrations": ",".join(REGISTRATIONS),
     "limit": 100,
     "sort": "asc"
 }
@@ -132,9 +77,7 @@ response.raise_for_status()
 
 recent_flights = response.json().get("data", [])
 
-print(
-    f"FR24 returned {len(recent_flights)} flight records."
-)
+print(f"FR24 returned {len(recent_flights)} flight records.")
 
 
 # --------------------------------------------------
@@ -161,6 +104,7 @@ for flight in recent_flights:
 
         print(
             f"Skipping in-progress flight: "
+            f"{registration} "
             f"{flight_number} "
             f"{origin} -> {destination}"
         )
@@ -170,18 +114,18 @@ for flight in recent_flights:
 
     completed_found += 1
 
-    # Require unique FR24 ID
+    # Require a unique FR24 ID
     if not fr24_id:
 
         print(
             f"Skipping flight with no FR24 ID: "
-            f"{flight_number}"
+            f"{registration} {flight_number}"
         )
 
         invalid += 1
         continue
 
-    # Check whether this flight already exists
+    # Check whether the flight is already stored
     existing = (
         supabase
         .table("flights")
@@ -194,6 +138,7 @@ for flight in recent_flights:
 
         print(
             f"Already stored: "
+            f"{registration} "
             f"{flight_number} "
             f"{origin} -> {destination} "
             f"({fr24_id})"
@@ -226,35 +171,11 @@ for flight in recent_flights:
 
     print(
         f"NEW FLIGHT STORED: "
+        f"{registration} "
         f"{flight_number} "
         f"{origin} -> {destination} "
         f"({fr24_id})"
     )
-
-
-# --------------------------------------------------
-# Update Collector State
-# --------------------------------------------------
-#
-# IMPORTANT:
-# We only reach this point if the FR24 request and all database
-# processing above completed successfully.
-#
-# Therefore a failed run will NOT advance our checkpoint.
-# --------------------------------------------------
-
-state_record = {
-    "collector_name": COLLECTOR_NAME,
-    "last_successful_run": now.isoformat(),
-    "updated_at": now.isoformat()
-}
-
-supabase.table(
-    "collector_state"
-).upsert(
-    state_record,
-    on_conflict="collector_name"
-).execute()
 
 
 # --------------------------------------------------
@@ -264,11 +185,12 @@ supabase.table(
 print()
 print("COLLECTION COMPLETE")
 print("--------------------------------")
-print(f"Aircraft:              {REGISTRATION}")
+print(f"Aircraft:              {', '.join(REGISTRATIONS)}")
+print(f"Lookback period:        {LOOKBACK_HOURS} hours")
 print(f"FR24 records returned: {len(recent_flights)}")
 print(f"Completed flights:     {completed_found}")
 print(f"New flights inserted:  {inserted}")
 print(f"Duplicates skipped:    {duplicates}")
 print(f"In-progress skipped:   {in_progress}")
 print(f"Invalid records:       {invalid}")
-print(f"Checkpoint updated:    {now.isoformat()}")
+print(f"Collection finished:   {now.isoformat()}")
