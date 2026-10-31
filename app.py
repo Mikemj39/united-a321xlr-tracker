@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -76,9 +77,14 @@ delivered = len(
     ]
 )
 
-active = len(
+# Count aircraft that have actually entered revenue service.
+# Newly delivered aircraft can be tracked before that date.
+in_service = len(
     fleet[
-        fleet["fleet_status"] == "Active"
+        fleet["fleet_status"].isin(["Delivered", "Active"])
+        & pd.to_datetime(
+            fleet["entry_into_service"], errors="coerce"
+        ).notna()
     ]
 )
 
@@ -101,7 +107,7 @@ col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("United XLR Order", total_order)
 col2.metric("Delivered", delivered)
-col3.metric("In Service", active)
+col3.metric("In Service", in_service)
 col4.metric("Tracked Aircraft", tracked)
 
 st.divider()
@@ -227,9 +233,10 @@ display_fleet = display_fleet.fillna("—")
 # Aircraft Selector
 # --------------------------------------------------
 
+# Include delivered aircraft even before revenue service.
 active_aircraft = (
     fleet[
-        fleet["fleet_status"] == "Active"
+        fleet["fleet_status"].isin(["Delivered", "Active"])
     ]["registration"]
     .dropna()
     .tolist()
@@ -266,7 +273,11 @@ else:
     xlr_flights = pd.DataFrame()
 
 
-st.markdown(f"### {selected_aircraft} Flight Statistics" if selected_aircraft else "### Flight Statistics")
+st.markdown(
+    f"### {selected_aircraft} Flight Statistics"
+    if selected_aircraft
+    else "### Flight Statistics"
+)
 
 
 if not xlr_flights.empty:
@@ -633,12 +644,13 @@ else:
 
     if selected_aircraft:
         st.info(
-            f"No completed revenue flight records are currently "
-            f"stored for {selected_aircraft}."
+            f"No flight records are currently stored for {selected_aircraft}. "
+            "Delivery, ferry, positioning, and revenue flights will appear "
+            "here once they are collected in Supabase."
         )
     else:
         st.info(
-            "No active aircraft are currently available."
+            "No delivered aircraft are currently available."
         )
 
 
