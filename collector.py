@@ -10,7 +10,8 @@ from supabase import create_client
 
 REGISTRATIONS = [
     "N64321",
-    "N64322",
+    "N64322"
+    "N64324",
 ]
 
 # Look back far enough to catch flights that were still
